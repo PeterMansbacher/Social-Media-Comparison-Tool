@@ -1,0 +1,129 @@
+###
+###PSocial Media Comparison A Project AWS documentation and info
+###11//13/2021
+
+8 GB RAM, 2 vCPUs, 160 GB SSD
+Django
+Virginia, Zone A (us-east-1a)
+
+
+Static IP:
+34.196.118.91 
+
+Private IP:
+172.26.3.10
+
+Public IPv6:
+2600:1f18:2145:a200:caa1:2207:85b6:774e
+
+System disk path /dev/xvda
+
+
+IPv4 Firewall
+
+Application	Protocol	Port or range / Code	Restricted to	
+SSH	TCP	
+22
+Any IPv4 address
+
+Lightsail browser SSH/RDP
+HTTP	TCP	
+80
+Any IPv4 address
+
+HTTPS	TCP	
+443
+Any IPv4 addressc
+
+Custom	TCP	
+8000
+Any IPv6 address
+
+IPv6 firewall
+Create rules to open ports to the internet, or to a specific IPv6 address or range.
+
+Learn more about firewall rules
+
+
+Application	Protocol	Port or range / Code	Restricted to	
+SSH	TCP	
+22
+Any IPv6 address
+
+HTTP	TCP	
+80
+Any IPv6 address
+
+HTTPS	TCP	
+443
+Any IPv6 address
+
+Custom	TCP	
+8000
+Any IPv4 address
+
+
+SocialComparisonA_db
+2 GB RAM, 1 vCPU, 80 GB SSD
+
+MySQL database (8.0.25)
+
+Virginia, Zone A (us-east-1a)
+
+
+Endpoint:
+ls-1ef1825172e62dcc237ee491d09a0c12aff562fe.cn5ycdfnko6g.us-east-1.rds.amazonaws.com
+Port:
+3306
+
+
+User name
+dbmasteruser
+
+Password
+q+o.H1sd$CRRZl&CSl>VK}-(~+t1ea&P
+
+
+
+Bitnami
+
+2psWsngok0MP
+
+
+
+
+
+https://docs.bitnami.com/aws/infrastructure/django/get-started/get-started/
+
+Launch Django bitnami console
+cd projects
+cd smc
+python manage.py runserver 0.0.0.0:8000
+
+Launch site from
+34.196.118.91:8000
+
+
+34.196.118.91:8000/admin
+django superuser
+user:djangomasteruser
+password:smc4738a
+
+
+
+To Access database
+use mysql work bench, xampp, or similar program
+Log in using db host (endpoint), port, username, and password
+
+##access database
+>>use smcDB;
+
+
+
+
+
+
+
+
+
+

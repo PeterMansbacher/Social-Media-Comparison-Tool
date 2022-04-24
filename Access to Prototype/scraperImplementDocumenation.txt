@@ -1,0 +1,20 @@
+###Last updated 12/2/2021
+Open AWS
+Go to lightsail
+Open Django console
+>>cd projects
+>>cd smc
+
+To run server: 
+>>python manage.py runserver 0.0.0.0:8000
+This opens the application on url http://34.196.118.91:8000/
+
+To implement scrapers
+>>cd smc_app
+>>nano views.py
+
+Module files should be put in the smc_app directory
+
+To make new files
+>>nano <filename>.<type>
+ctrl-v doesnt paste, so need to right click cursor and paste like that. 
