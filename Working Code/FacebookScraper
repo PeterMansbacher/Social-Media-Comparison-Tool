@@ -1,0 +1,198 @@
+########## Main Function - Retrieves WebElements and stores them into the database ##########
+########## Note: Imports must be called outside of the function, and exist above the function on the server. ##########
+def main_scrape(brand, date_r):
+    ########## Instantiation of the element holding variables and "list_holder" to keep track of when the date was exceeded ##########
+    likes = []
+    dates = []
+    comments = []
+    posts = []
+    list_holder = 0
+    ########## Chrome options to make the code work on the server ##########
+    chromeOptions = Options()
+    chromeOptions.add_argument('--no-sandbox')
+    chromeOptions.add_argument('--remote-debugging-port=44224')
+    chromeOptions.add_argument('--disable-dev-shm-using')
+    chromeOptions.add_argument('--headless')
+    chromeOptions.add_argument('disable-setuid-sandbox')
+    chromeOptions.add_argument('--disable-gpu')
+    driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=chromeOptions)
+    
+    
+    date_range = eval_dates(date_r)
+    driver.get('https://www.facebook.com/{}'.format(brand))
+
+    ########## ESTABLISH CONNECTION WITH DB ##########
+    # server = "ls-1ef1825172e62dcc237ee491d09a0c12aff562fe.cn5ycdfnko6g.us-east-1.rds.amazonaws.com"
+    # database_ = 'smcDB'
+    # username = 'dbmasteruser'
+    # password_ = 'q+o.H1sd$CRRZl&CSl>VK}-(~+t1ea&P'
+
+    # db = pymysql.connect(host=server, user=username, password=password_, database=database_, charset='utf8mb4',
+    #                      cursorclass=pymysql.cursors.DictCursor, port=3306)
+    # cursor = db.cursor()
+
+    # print("Database connection successfully established")
+
+
+    # While loop that continues to scroll, grab elements, and modify them accordingly until the date range is reached.
+    count = 0
+    while True:
+        rand = random.randint(0, 10000)
+        count += 1
+        likes = driver.find_elements_by_xpath('/html/body/div[1]/div[3]/div[1]/div/div/div[2]/div[2]/div/div[3]/div[2]/div/div[1]/div/div[2]/div/div[1]/div[2]/div/div/div[2]/div[2]/form/div/div[2]/div[1]/div/div[1]/a/span[2]/span/span')
+        #likes = driver.find_elements_by_class_name("_81hb")
+        dates = driver.find_elements_by_class_name("timestampContent")
+        comments = driver.find_elements_by_class_name("_3hg-._42ft")
+        posts = driver.find_elements_by_class_name("_5pbx.userContent._3576")
+        shares = driver.find_elements_by_class_name("_355t._4vn2")
+        ########## Print the data - for testing purposes ##########
+        #print_data(posts, likes, dates, comments)
+        print(likes)
+
+
+########## Code for the database, commented until server issues are fixed with element grabbing ##########
+#         sql = '''
+#         insert into smcDB.FACEBOOK(BrandHandle,PostUrl,PostDate,PostText,Likes,Comments,Shares) values('%s','%s',
+#         '%s','%s','%s','%s','%s') 
+#         ''' % (handle, rand, dates, posts, likes, comments, shares)
+#         cursor.execute(sql)
+#         db.commit()
+
+#         print("Successfully committed to database")
+
+        # Remove duplicate likes from the list
+        likes = remove_dupes(likes)
+        # Standardize the date values for evaluation
+        dates = eval_dates(dates)
+        # Check if the date is outside of the specified range
+        done_searching, list_holder = cancel_scraping(date_range, dates)
+
+        # If date is outside range, return values
+        if done_searching:
+            print("Date range exceeded, terminating.")
+            return posts, likes, comments, shares, dates
+        # Scroll "infinitely" or until we find a date outside the range
+        scroller(driver)
+        rand_time = random.randint(25,60)
+        time.sleep(rand_time)
+
+        # Specify how many scrolls we want to make (used mostly for dates that would be considered long ago)
+        if count == 2:
+            return posts, likes, comments, shares, dates
+        else:
+            continue
+
+    #remove_extras()
+# Function to scroll down the screen and load new elements
+def scroller(driver):
+    curr_height = driver.execute_script("return document.documentElement.scrollHeight")
+    while True:
+        driver.execute_script("window.scrollTo(0, " + str(curr_height) + ");")
+        time.sleep(1
+                   )
+        new_height = driver.execute_script("return document.documentElement.scrollHeight")
+        if curr_height == new_height:
+            break
+        curr_height = new_height
+ 
+# Function to print out the data retrieved to the console - mostly for testing
+def print_data(posts, likes, dates, comments):
+    for item in posts:
+        print("Posts: ",item.text)
+    for item in likes:
+        print("Likes: ",item)
+    for item in comments:
+        print("Comments: ",item.text)
+    for item in dates:
+        print("Dates:",item)
+ 
+# Function to remove duplicate values from the element lists
+def remove_dupes(likes):
+    temp = []
+    for item in likes:
+        if item.text not in temp:
+            temp.append(item.text)
+        else:
+            continue   
+    return temp    
+# Function to standardize dates, can take in a list or a single string value
+def eval_dates(dates):
+    if isinstance(dates, list):
+        temp = []
+        temp_ = []
+        for item in dates:
+            temp.append(parse(item.text))
+        for item in temp:
+            temp_.append(item.date())
+        return temp_
+    elif isinstance(dates, str):
+            temp_str = parse(dates)
+            temp_str = temp_str.date()
+            return temp_str
+# Function to cancel scraping based on the date input from the form
+def cancel_scraping(date, dates):
+    count = 0
+    for item in dates:
+        count += 1
+        print(item, date)
+        if item < date:
+            return True, count
+        else:
+            continue
+    return False, count
+# Function to remove extra values from lists, due to nature of element pulling, even when the date is
+# outside of the range it gets added because they're pulled in chunks. This will remove extras.
+def remove_extras(list_holder, dates):
+    for i in range(list_holder-1, len(dates)):
+        print("Index:", i)
+        print("Length:", len(dates))
+        print("List Holder: ", list_holder)
+        del posts[i]
+        del likes[i]
+        del comments[i]
+        del shares[i]
+        del dates[i]
+##### Code Testing Section #####
+    from selenium import webdriver
+    from selenium.common.exceptions import TimeoutException
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
+    from webdriver_manager.chrome import ChromeDriverManager
+    import getpass
+    import calendar
+    import os
+    import platform
+    import sys
+    import time
+    import urllib.request
+    import pymysql
+    import random
+    from dateutil.parser import parse
+    import datetime
+posts, likes, comments, shares, dates = main_scrape("cocacolaunitedstates", "2021-06-30")
+##### Documentation Section #####
+##### Regarding Functionality on Server #####
+'''
+1.) As it stands - the Facebook scraper behaves correctly on a windows machine. However, when the scraper is run on the AWS 
+instance it automatically is redirected to the login page. Currently I've attempted the following fixes:
+    - Rotating Proxies
+    - Disabling Selenium headers
+    - Redirecting from the login page to the page that is to be scraped
+    - Mobile emulation
+Come semester 2, I have plans to attempt the following fixes:
+    - Modify the Selenium source code such that Facebook cannot tell from Seleniums own Javascript it's being scraped.
+    - Attempt to route the requests through the Selenium Hub onto a windows machine, and run the scraping from the windows
+      operating system.
+      
+2.) Obviously, if the application is not able to scrape on the server, it is not functional. However, if the issue of 
+automatic redirection to a login page can be overcome, the code will work as intended with no modifications.
+
+3.) If it is not possible to find a solution in the second semester, I plan to attempt the following solutions:
+    - Scrape the HTML using only BeautifulSoup by gathering all of the HTML once and parsing it offline on the server.
+    - Logging in. It should be noted, logging in is seen as a last resort as the client does not want to have to login 
+      under any circumstances if it can be avoided. Additionally, logging in is risky because it opens the server to 
+      potentially being IP banned.
+'''
