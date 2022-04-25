@@ -1,0 +1,205 @@
+def main_scraper(brand, brand1, brand2, date_range_end, date_range_start):
+    # Authenticate to Twitter
+    auth = tweepy.OAuthHandler("GLQHotmk7W87lffhzrVvP78Xr", "XG7DHRT0H1aTHAaeJr3KujPyQ4CHecaW4vFynMTeD7uQYu7twv")
+    auth.set_access_token("1069081694982918146-ivPGAPKHcW5iW1aNW02yB0R684i9RI", "SKAoOdLNHzDgeIkTaREVzgKb4vZHQ3GQeJGtybPZJ8btZ")
+    comments = []
+    retweets = []
+    brands = [brand, brand1, brand2]
+    ##### Standardizing Form Input Dates #####
+    date_range_end = eval_dates(date_range_end)
+    date_range_start = eval_dates(date_range_start)
+    ##### ESTABLISH CONNECTION WITH DB #####
+    server = "ls-1ef1825172e62dcc237ee491d09a0c12aff562fe.cn5ycdfnko6g.us-east-1.rds.amazonaws.com"
+    database_ = 'smcDB'
+    username = 'dbmasteruser'
+    password_ = 'q+o.H1sd$CRRZl&CSl>VK}-(~+t1ea&P'
+
+    db = pymysql.connect(host=server, user=username, password=password_, database=database_, charset='utf8mb4',
+                         cursorclass=pymysql.cursors.DictCursor, port=3306)
+    cursor = db.cursor()
+
+    print("Database connection successfully established")
+
+    # Create API object
+    api = tweepy.API(auth)
+
+    ##### Error catching in case API connection fails #####
+    try:
+        api.verify_credentials()
+    except:
+        print("Error during authentication")
+        
+    ##### Chrome Options #####
+    chromeOptions = Options()
+    chromeOptions.add_argument('--no-sandbox')
+    chromeOptions.add_argument('disable-infobars')
+    chromeOptions.add_argument('disable-blink-features=AutomationContrlled')
+    chromeOptions.add_argument('--remote-debugging-port=44224')
+    chromeOptions.add_argument('--disable-dev-shm-using')
+    chromeOptions.add_argument('--headless')
+    chromeOptions.add_argument('disable-setuid-sandbox')
+    chromeOptions.add_argument('--disable-gpu')
+    
+    ##### Begin For-loop which iterates through listed brands #####
+    for item in brands:
+        
+        print(date_range_start)
+        comments.clear()
+        retweets.clear()
+        
+        ##### Instantiate webdriver #####
+        driver = webdriver.Chrome()#'C:\\Users\\slick\\Desktop\\School Files\\Senior Design\\Chromedriver\\',options=options)
+        driver.get('https://www.twitter.com/{}'.format(item))
+        time.sleep(5)
+
+
+        ##### Pulling comment and retweet information, due to how they're retrieved - need to stuff the text into lists #####
+        while True:
+            comment_element = driver.find_elements_by_xpath("//div[@data-testid='reply']")
+            retweet_element = driver.find_elements_by_xpath("//div[@data-testid='retweet']")
+            for comment_count in comment_element:
+                comments.append(comment_count.text)
+            for retweet_count in retweet_element:
+                retweets.append(retweet_count.text)
+            scroller(driver)
+            if len(comments) >= 200:
+                break
+
+        ##### Grabbing tweets #####
+        tweets = api.user_timeline(screen_name=item, count=200, include_rts = True, tweet_mode='extended', exclude_replies=True, exclude='pinned')
+        ##### Standardizing Tweet Dates #####
+        eval_dates(tweets)
+        ##### Synchronizing tweet position with comments/retweets - since those are individually scraped and not API #####
+        counter = set_counter(tweets, date_range_start)
+        print(counter)
+        ##### Tweets are automatically pulled in groups - this removes tweets that fall out of the range #####
+        remove_extras(tweets, date_range_end, date_range_start)
+        ##### Removing apostrophes from strings as that's breaking the DB currently (will likely be removed) #####
+        remove_apostrophe(tweets)
+
+        string_to_int(comments)
+        string_to_int(retweets)
+
+        ##### Pushing tweet data to database #####
+        for tweet in tweets:
+            print(counter)
+            print(tweet.created_at, comments[counter], retweets[counter])
+            rand = random.randint(0, 10000)
+            sql = '''
+            insert into smcDB.TWITTER(BrandHandle,PostUrl,PostDate,PostText,Likes,Comments,Retweets) values('%s','%s',
+            '%s','%s','%i','%i','%i') 
+            ''' % (item, tweet.id, tweet.created_at, tweet.full_text, int(tweet.favorite_count), int(comments[counter]), int(retweets[counter]))
+            cursor.execute(sql)
+            db.commit()
+            counter += 1
+            print("Successfully committed to database")
+        tweets.clear()
+        print(tweets)
+        driver.close()
+# Function to scroll down the screen and load new elements
+def scroller(driver):
+    curr_height = driver.execute_script("return document.documentElement.scrollHeight")
+    while True:
+        driver.execute_script("window.scrollTo(0, " + str(curr_height) + ");")
+        time.sleep(3)
+        new_height = driver.execute_script("return document.documentElement.scrollHeight")
+        if curr_height == new_height:
+            return curr_height
+        curr_height = new_height
+        return curr_height
+def eval_dates(tweets):
+    # Check if tweets is the list of tweets or the string from user
+    if isinstance(tweets, tweepy.models.ResultSet):
+        # Removing time stamp from tweet date and storing into temp
+        for tweet in tweets:
+            tweet.created_at = tweet.created_at.date()
+    # Check if tweets is the list of tweets or the string from user
+    elif isinstance(tweets, str):
+            # Parse date into datetime object
+            temp_str = parse(tweets)
+            # Remove timestamp from date objects
+            temp_str = temp_str.date()
+            return temp_str
+##### Function for testing retrieved information #####
+def iterate_tweets(tweets, comments, retweets):
+    counter = 0
+    for info in tweets:
+         print("ID: {}".format(info.id))
+         print("Date:", info.created_at)
+         print("Tweet:", info.full_text)
+         print("Favorites:", info.favorite_count)
+         print("Comments: ", comments[counter])
+         print("Retweets: ", retweets[counter])
+         counter += 1
+         print("\n")
+##### Function for removing tweets that fall out of range #####
+def remove_extras(tweets, date_range_end, date_range_start):
+    for i in reversed(tweets):
+        if i.created_at < date_range_end or i.created_at > date_range_start:
+            tweets.remove(i)
+##### Removing apostrophes from tweet text until DB can handle them #####
+def remove_apostrophe(tweets):
+    for item in tweets:
+        item.full_text = item.full_text.replace("'", "")
+##### Function to synchronize the comments with the tweet objects, since they're pulled individually #####
+def set_counter(tweets, date_range_start):
+    for i in range(len(tweets)):
+        if tweets[i].created_at > date_range_start:
+            continue
+        else:
+            # Returns the count of the tweet position where the database storage should start
+            return i
+##### Function to pass integers to the database instead of ints, for returning views #####
+##### Function will be modified in semester 2 if possible to include more accurate counts #####
+def string_to_int(temp):
+    for item in range(len(temp)):
+        if len(temp[item]) == 2:
+            temp[item] = temp[item].replace("k", "000")
+            temp[item] = temp[item].replace("K", "000")
+            temp[item] = temp[item].replace(".", "")
+        else:
+            temp[item] = temp[item].replace("k", "00")
+            temp[item] = temp[item].replace("K", "00")
+            temp[item] = temp[item].replace(".", "")
+##### Testing Section #####
+import tweepy
+import json
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
+import getpass
+import calendar
+import os
+import platform
+import sys
+import time
+import urllib.request
+import pymysql
+import random
+from dateutil.parser import parse
+import datetime
+main_scraper("target", "walmart", "apple", "2021-11-15", "2021-12-01" )
+##### Documentation Section #####
+##### Comment and Retweet Count Scraping #####
+'''
+1.) Comments and retweets are currently out of sync with the actual tweets themselves. The reason for this is currently 
+being evaluated. When the code is executed, certain tweets are skipped over and it's currently unclear why. As it stands, the
+code will jump to a tweet well below the current scroll of the website - and then jump back. This error forces the synchronization
+of tweets and comments/retweets to be off by a few tweets upon each iteration of the program.
+2.) Currently it's being investigated whether or not tweets are being "re-scraped" after they code jumps down and back up. 
+If the tweets are not being re-scraped, we can accept this within the margin of error of the program given that it is
+around a 5% error rate. However, if it is discovered that tweets are being duplicated, the issue will have to be rectified and
+the synchronization will have to either account for the discrepancies and remove them, or stop them from happening altogether.
+'''
+##### Regarding ReTweets #####
+'''
+1.) Please note that retweets return a "likes" value of 0 from the API. This is not seen as an issue because the post
+isn't actually coming from the brand that's being scraped. They've been included due to synchronization efforts of 
+comments/retweets (where here retweets means the number of times a post from the brand was retweeted) with their respective
+tweets.
+'''
